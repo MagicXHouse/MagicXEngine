@@ -5,7 +5,12 @@ layout(location = 1) in vec3 inColor;
 
 layout(location = 0) out vec3 fragColor;
 
+// MVP 矩阵（由后端 RenderScene 经 push constant 传入）
+layout(push_constant) uniform PushConstants {
+    mat4 mvp;
+} pc;
+
 void main() {
-    gl_Position = vec4(inPosition, 1.0);
+    gl_Position = pc.mvp * vec4(inPosition, 1.0);
     fragColor   = inColor;
 }

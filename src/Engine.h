@@ -1,24 +1,11 @@
 #pragma once
-#include <memory>
-
-namespace MagicXEngine::Core { class Window; }
-namespace MagicXEngine::RHI { class IRHIDevice; }
-namespace MagicXEngine::Renderer { class TriangleRenderer; }
+#include <string>
+#include "Frontend/Scene.h"
 
 namespace MagicXEngine {
 
-// 引擎主循环：负责窗口、RHI 设备、渲染器的生命周期与帧循环。
-class Engine {
-public:
-    Engine();
-    ~Engine();
-
-    void Run();
-
-private:
-    std::unique_ptr<Core::Window>          m_window;
-    std::unique_ptr<RHI::IRHIDevice>       m_device;
-    std::unique_ptr<Renderer::TriangleRenderer> m_renderer;
-};
+// 运行一个场景：创建窗口 + RHI 设备 + RenderScene，进入渲染循环。
+// 每个案例（Case）调用此函数即可独立运行。
+int RunScene(const Frontend::Scene& scene, const std::string& title = "MagicXEngine");
 
 } // namespace MagicXEngine
