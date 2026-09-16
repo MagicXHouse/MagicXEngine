@@ -6,9 +6,10 @@
 
 ```
 MagicXEngine/
-├── CMakeLists.txt            # 构建脚本（自动拉取 GLFW、用 glslc 编译并内嵌 shader）
+├── CMakeLists.txt            # 构建脚本（内置 GLFW、用 glslc 编译并内嵌 shader）
 ├── cmake/embed_shader.cmake  # 把 SPIR-V 内嵌为 C++ 字节数组
 ├── shaders/                  # GLSL 源文件（triangle.vert / triangle.frag）
+├── third_party/glfw/         # 内置的 GLFW 3.4（离线可编译，不依赖网络）
 └── src/
     ├── main.cpp              # 入口
     ├── Engine.{h,cpp}        # 窗口 + RHI 设备 + 渲染器的生命周期与帧循环
@@ -33,19 +34,20 @@ MagicXEngine/
 
 - **Vulkan SDK**（提供 vulkan.h、vulkan-1.lib、glslc、校验层）
   - 安装：`winget install KhronosGroup.VulkanSDK`
-  - 安装后需设置环境变量 `VULKAN_SDK`（SDK 安装器通常会自动设置，若当前终端没有则重启终端）
+  - 无需手动设置环境变量：CMake 会自动定位 `C:\VulkanSDK` 下的 SDK；若装在别处，再设置 `VULKAN_SDK` 即可
 - **CMake ≥ 3.20** 与任意 C++20 编译器（MSVC / clang / MinGW）
-- **GLFW**：优先使用系统安装，否则由 CMake 自动从 GitHub 拉取（3.4）
+- **GLFW 3.4**：已内置到 third_party/glfw，无需联网下载
 
 ## 构建（Windows）
 
 ```powershell
 cd D:\proj\MagicXEngine
 cmake -S . -B build -G "Visual Studio 17 2022" -A x64
+cmake --build build --config Release
 .\build\Release\MagicXEngine.exe
 ```
 
-> 使用 Visual Studio 生成器时，运行 `cmake --build build --config Release` 即可。
+> 生成的解决方案在 `build/MagicXEngine.sln`，可直接用 Visual Studio 打开调试（VS 2026 生成器则产出 `.slnx` 新格式）。
 
 ## 架构说明：RHI 抽象与后端扩展
 
