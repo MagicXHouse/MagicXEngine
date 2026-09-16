@@ -31,22 +31,14 @@ endif()
 find_package(Vulkan REQUIRED)
 
 # ---------------------------------------------------------------------------
-# Windowing library: GLFW. Prefer an installed copy, otherwise fetch it.
+# Windowing library: GLFW（已内置到 third_party/glfw，离线可编译，不依赖网络下载）
 # Abstracted behind Core::Window so it can be swapped later (e.g. SDL/Win32).
 # ---------------------------------------------------------------------------
-find_package(glfw3 QUIET)
-if(NOT glfw3_FOUND)
-  message(STATUS "glfw3 not found, fetching GLFW 3.4 from GitHub")
-  include(FetchContent)
-  set(GLFW_BUILD_DOCS     OFF CACHE BOOL "" FORCE)
-  set(GLFW_BUILD_TESTS    OFF CACHE BOOL "" FORCE)
-  set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
-  set(GLFW_INSTALL        OFF CACHE BOOL "" FORCE)
-  FetchContent_Declare(glfw
-    URL https://github.com/glfw/glfw/archive/refs/tags/3.4.zip
-    DOWNLOAD_EXTRACT_TIMESTAMP TRUE)
-  FetchContent_MakeAvailable(glfw)
-endif()
+set(GLFW_BUILD_DOCS     OFF CACHE BOOL "" FORCE)
+set(GLFW_BUILD_TESTS    OFF CACHE BOOL "" FORCE)
+set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+set(GLFW_INSTALL        OFF CACHE BOOL "" FORCE)
+add_subdirectory(${CMAKE_SOURCE_DIR}/third_party/glfw)
 
 # ---------------------------------------------------------------------------
 # Shaders: compile GLSL -> SPIR-V with glslc, then embed as C++ byte arrays so

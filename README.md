@@ -1,7 +1,6 @@
 # MagicXEngine
 
-一个用于学习/验证图形算法、为后续扩展 RHI 层（OpenGL / Metal / D3D12）而设计的微型图形引擎。
-当前后端为 **Vulkan**，首个 Demo 为绘制一个彩色三角形。
+一个用于验证图形算法而设计的微型图形引擎。
 
 ## 目录结构
 
@@ -42,8 +41,7 @@ MagicXEngine/
 
 ```powershell
 cd D:\proj\MagicXEngine
-cmake -S . -B build
-cmake --build build --config Release
+cmake -S . -B build -G "Visual Studio 17 2022" -A x64
 .\build\Release\MagicXEngine.exe
 ```
 
