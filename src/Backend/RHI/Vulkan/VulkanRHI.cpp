@@ -1,6 +1,8 @@
 #include "MagicXEngine/Backend/RHI/Vulkan/VulkanRHI.h"
 
 #include "MagicXEngine/Backend/RHI/Vulkan/VulkanBuffer.h"
+#include "MagicXEngine/Backend/RHI/Vulkan/VulkanComputePipeline.h"
+#include "MagicXEngine/Backend/RHI/Vulkan/VulkanDescriptorSet.h"
 #include "MagicXEngine/Backend/RHI/Vulkan/VulkanHelpers.h"
 #include "MagicXEngine/Backend/RHI/Vulkan/VulkanPipeline.h"
 #include "MagicXEngine/Backend/RHI/Vulkan/VulkanSwapchain.h"
@@ -123,7 +125,9 @@ void VulkanCommandBuffer::EndRenderPass() {
 void VulkanCommandBuffer::BindPipeline(IRHIPipeline* pipeline) {
     auto* p = static_cast<VulkanPipeline*>(pipeline);
     vkCmdBindPipeline(m_cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, p->GetHandle());
-    m_currentLayout = p->GetLayout();
+    m_currentLayout    = p->GetLayout();
+    m_currentBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+    m_currentPushStage = VK_SHADER_STAGE_VERTEX_BIT;
 }
 
 void VulkanCommandBuffer::BindVertexBuffer(IRHIBuffer* buffer, uint64_t offset) {
@@ -166,7 +170,48 @@ void VulkanCommandBuffer::DrawIndexed(uint32_t indexCount, uint32_t instanceCoun
 }
 
 void VulkanCommandBuffer::PushConstants(const void* data, uint32_t size, uint32_t offset) {
-    vkCmdPushConstants(m_cmd, m_currentLayout, VK_SHADER_STAGE_VERTEX_BIT, offset, size, data);
+    vkCmdPushConstants(m_cmd, m_currentLayout, m_currentPushStage, offset, size, data);
+}
+
+void VulkanCommandBuffer::BindComputePipeline(IRHIPipeline* pipeline) {
+    auto* p = static_cast<VulkanComputePipeline*>(pipeline);
+    vkCmdBindPipeline(m_cmd, VK_PIPELINE_BIND_POINT_COMPUTE, p->GetHandle());
+    m_currentLayout    = p->GetLayout();
+    m_currentBindPoint = VK_PIPELINE_BIND_POINT_COMPUTE;
+    m_currentPushStage = VK_SHADER_STAGE_COMPUTE_BIT;
+}
+
+void VulkanCommandBuffer::BindDescriptorSet(IRHIDescriptorSet* set) {
+    auto* ds = static_cast<VulkanDescriptorSet*>(set);
+    VkDescriptorSet handle = ds->GetHandle();
+    vkCmdBindDescriptorSets(m_cmd, m_currentBindPoint, m_currentLayout, 0, 1, &handle, 0, nullptr);
+}
+
+void VulkanCommandBuffer::Dispatch(uint32_t groupX, uint32_t groupY, uint32_t groupZ) {
+    vkCmdDispatch(m_cmd, groupX, groupY, groupZ);
+}
+
+void VulkanCommandBuffer::DrawIndexedIndirect(IRHIBuffer* indirectBuffer, uint64_t offset,
+                                              uint32_t drawCount, uint32_t stride) {
+    auto* ib = static_cast<VulkanBuffer*>(indirectBuffer);
+    vkCmdDrawIndexedIndirect(m_cmd, ib->GetHandle(), static_cast<VkDeviceSize>(offset),
+                             drawCount, stride);
+}
+
+void VulkanCommandBuffer::PipelineBarrier(PipelineStage src, PipelineStage dst) {
+    // 简化实现：全局内存屏障。当前唯一用到且支持的转换是
+    //   compute 写存储缓冲（SHADER_WRITE）→ 间接绘制读（INDIRECT_COMMAND_READ）。
+    VkMemoryBarrier memBarrier{};
+    memBarrier.sType         = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
+    memBarrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+    memBarrier.dstAccessMask = VK_ACCESS_INDIRECT_COMMAND_READ_BIT;
+
+    vkCmdPipelineBarrier(m_cmd,
+                         ToVulkan(src), ToVulkan(dst),
+                         0,
+                         1, &memBarrier,
+                         0, nullptr,
+                         0, nullptr);
 }
 
 // ===========================================================================
@@ -516,6 +561,16 @@ std::unique_ptr<IRHIBuffer> VulkanDevice::CreateBuffer(const BufferDesc& desc,
 
 std::unique_ptr<IRHIPipeline> VulkanDevice::CreatePipeline(const PipelineDesc& desc) {
     return std::make_unique<VulkanPipeline>(m_device, m_renderPass, desc);
+}
+
+std::unique_ptr<IRHIPipeline> VulkanDevice::CreateComputePipeline(const ComputePipelineDesc& desc) {
+    return std::make_unique<VulkanComputePipeline>(m_device, desc);
+}
+
+std::unique_ptr<IRHIDescriptorSet> VulkanDevice::CreateDescriptorSet(
+    const DescriptorSetLayoutDesc& layout,
+    const std::vector<DescriptorBufferBinding>& bindings) {
+    return std::make_unique<VulkanDescriptorSet>(m_device, layout, bindings);
 }
 
 Format VulkanDevice::GetSwapchainFormat() const {

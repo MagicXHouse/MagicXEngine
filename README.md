@@ -1,6 +1,6 @@
 # MagicXEngine
 
-一个用于验证图形算法而设计的微型图形引擎。
+一个用于验证图形算法而设计的微型GPU-Driven图形引擎。
 
 ## 三层架构
 
@@ -53,7 +53,7 @@ MagicXEngine/
 ## 构建（Windows）
 
 ```powershell
-cd D:\proj\MagicXEngine
+打开项目所在路径，打开git bash，输入：
 cmake -S . -B build -G "Visual Studio 17 2022" -A x64
 cmake --build build --config Release
 .\build\Release\Case01_Triangle.exe

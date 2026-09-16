@@ -6,6 +6,12 @@
 
 namespace MagicXEngine::Frontend {
 
+// 渲染模式：Direct = CPU 逐对象直绘；Indirect = GPU 驱动（compute 生成间接绘制命令）
+enum class RenderMode {
+    Direct = 0,
+    Indirect = 1,
+};
+
 // 场景对象：一个网格 + 一个变换
 struct SceneObject {
     MeshData  mesh;
@@ -16,6 +22,7 @@ struct SceneObject {
 struct Scene {
     std::vector<SceneObject> objects;
     Camera camera;
+    RenderMode renderMode = RenderMode::Direct;
 };
 
 } // namespace MagicXEngine::Frontend

@@ -7,10 +7,13 @@
 namespace MagicXEngine::RHI {
 
 // 引擎枚举 -> Vulkan 枚举
-VkFormat            ToVulkan(Format format);
-VkBufferUsageFlags  ToVulkan(BufferUsage usage);
+VkFormat             ToVulkan(Format format);
+VkBufferUsageFlags   ToVulkan(BufferUsage usage);
+VkShaderStageFlags   ToVulkan(ShaderStage stage);
+VkDescriptorType     ToVulkan(DescriptorType type);
+VkPipelineStageFlags ToVulkan(PipelineStage stage);
 // Vulkan 枚举 -> 引擎枚举
-Format              FromVulkan(VkFormat format);
+Format               FromVulkan(VkFormat format);
 
 // 校验 VkResult，失败抛异常
 void VkCheck(VkResult result, const std::string& what);

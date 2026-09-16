@@ -8,6 +8,8 @@ namespace MagicXEngine::RHI {
 class IRHIDevice;
 class IRHIPipeline;
 class IRHIBuffer;
+class IRHICommandBuffer;
+class IRHIDescriptorSet;
 }
 
 namespace MagicXEngine::Backend {
@@ -35,10 +37,19 @@ private:
         Frontend::Transform transform;
     };
 
+    // Indirect 模式：compute 生成间接命令 → barrier → 间接绘制
+    void RenderIndirect(RHI::IRHICommandBuffer* cmd, float aspect, uint32_t w, uint32_t h);
+
     RHI::IRHIDevice* m_device = nullptr;
     std::unique_ptr<RHI::IRHIPipeline> m_pipeline;
     std::vector<GpuObject> m_objects;
     Frontend::Camera m_camera;
+
+    // GPU 驱动（间接绘制）资源
+    Frontend::RenderMode m_renderMode = Frontend::RenderMode::Direct;
+    std::unique_ptr<RHI::IRHIPipeline>      m_computePipeline;
+    std::unique_ptr<RHI::IRHIDescriptorSet> m_descriptorSet;
+    std::unique_ptr<RHI::IRHIBuffer>        m_indirectBuffer;
 };
 
 } // namespace MagicXEngine::Backend

@@ -23,7 +23,34 @@ VkBufferUsageFlags ToVulkan(BufferUsage usage) {
     if (usage & BufferUsage::Uniform)     flags |= VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
     if (usage & BufferUsage::TransferSrc) flags |= VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
     if (usage & BufferUsage::TransferDst) flags |= VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+    if (usage & BufferUsage::Storage)     flags |= VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
+    if (usage & BufferUsage::Indirect)    flags |= VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT;
     return flags;
+}
+
+VkShaderStageFlags ToVulkan(ShaderStage stage) {
+    switch (stage) {
+        case ShaderStage::Vertex:   return VK_SHADER_STAGE_VERTEX_BIT;
+        case ShaderStage::Fragment: return VK_SHADER_STAGE_FRAGMENT_BIT;
+        case ShaderStage::Compute:  return VK_SHADER_STAGE_COMPUTE_BIT;
+        default:                    return 0;
+    }
+}
+
+VkDescriptorType ToVulkan(DescriptorType type) {
+    switch (type) {
+        case DescriptorType::StorageBuffer: return VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        case DescriptorType::UniformBuffer: return VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        default:                            return VK_DESCRIPTOR_TYPE_MAX_ENUM;
+    }
+}
+
+VkPipelineStageFlags ToVulkan(PipelineStage stage) {
+    switch (stage) {
+        case PipelineStage::Compute:      return VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
+        case PipelineStage::DrawIndirect: return VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT;
+        default:                          return 0;
+    }
 }
 
 Format FromVulkan(VkFormat format) {

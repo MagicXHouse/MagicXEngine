@@ -1,0 +1,25 @@
+#version 450
+
+// 索引间接绘制命令，与 C 侧 DrawIndexedIndirectCommand 布局一致（20 字节）
+struct DrawIndexedIndirectCommand {
+    uint indexCount;
+    uint instanceCount;
+    uint firstIndex;
+    int  vertexOffset;
+    uint firstInstance;
+};
+
+layout(std430, set = 0, binding = 0) buffer IndirectBuffer {
+    DrawIndexedIndirectCommand cmd;
+} indirect;
+
+layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
+
+void main() {
+    // 固定写一条命令：画一个三角形（3 个索引）
+    indirect.cmd.indexCount    = 3;
+    indirect.cmd.instanceCount = 1;
+    indirect.cmd.firstIndex    = 0;
+    indirect.cmd.vertexOffset  = 0;
+    indirect.cmd.firstInstance = 0;
+}

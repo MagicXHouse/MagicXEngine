@@ -66,6 +66,7 @@ endfunction()
 
 embed_shader(${SHADER_DIR}/triangle.vert triangle_vert_spv ${GENERATED_DIR}/triangle_vert_spv.h)
 embed_shader(${SHADER_DIR}/triangle.frag triangle_frag_spv ${GENERATED_DIR}/triangle_frag_spv.h)
+embed_shader(${SHADER_DIR}/cull.comp     cull_comp_spv     ${GENERATED_DIR}/cull_comp_spv.h)
 
 # ---------------------------------------------------------------------------
 # 引擎静态库（Core + Frontend + Backend + RHI）
@@ -80,6 +81,7 @@ add_library(MagicXEngine STATIC
   ${ENGINE_SOURCES}
   ${GENERATED_DIR}/triangle_vert_spv.h
   ${GENERATED_DIR}/triangle_frag_spv.h
+  ${GENERATED_DIR}/cull_comp_spv.h
 )
 
 target_include_directories(MagicXEngine
@@ -112,7 +114,7 @@ function(add_case NAME SOURCE)
 endfunction()
 
 add_case(Case01_Triangle ${CMAKE_SOURCE_DIR}/cases/Case01_Triangle.cpp)
-# 后续新增案例：add_case(Case02_XXX ${CMAKE_SOURCE_DIR}/cases/Case02_XXX.cpp)
+add_case(Case02_GPUDriven ${CMAKE_SOURCE_DIR}/cases/Case02_GPUDriven.cpp)
 
 # VS 默认启动项目
 set_property(DIRECTORY PROPERTY VS_STARTUP_PROJECT Case01_Triangle)

@@ -11,12 +11,14 @@
 
 #include <cstdint>
 #include <memory>
+#include <vector>
 
 namespace MagicXEngine::RHI {
 
 class IRHIBuffer;
 class IRHIPipeline;
 class IRHICommandBuffer;
+class IRHIDescriptorSet;
 
 // 平台窗口描述，由窗口层填充后传给 RHI 创建表面。
 struct WindowSurface {
@@ -38,6 +40,19 @@ public:
     virtual ~IRHIPipeline() = default;
 };
 
+// 描述符集合：绑定若干缓冲（SSBO/UBO）供着色器访问。
+// 具体缓冲在 IRHIDevice::CreateDescriptorSet 时一次性写入。
+class IRHIDescriptorSet {
+public:
+    virtual ~IRHIDescriptorSet() = default;
+};
+
+// 描述符创建时绑定的实际缓冲
+struct DescriptorBufferBinding {
+    uint32_t    binding = 0;  // 对应 DescriptorSetLayoutDesc 中的 binding 编号
+    IRHIBuffer* buffer  = nullptr;
+};
+
 class IRHICommandBuffer {
 public:
     virtual ~IRHICommandBuffer() = default;
@@ -56,6 +71,14 @@ public:
                              uint32_t firstIndex = 0, int32_t vertexOffset = 0,
                              uint32_t firstInstance = 0) = 0;
     virtual void PushConstants(const void* data, uint32_t size, uint32_t offset = 0) = 0;
+
+    // ---- 计算 / 间接绘制 / 屏障（GPU-Driven） ----
+    virtual void BindComputePipeline(IRHIPipeline* pipeline) = 0;
+    virtual void BindDescriptorSet(IRHIDescriptorSet* set) = 0;
+    virtual void Dispatch(uint32_t groupX, uint32_t groupY = 1, uint32_t groupZ = 1) = 0;
+    virtual void DrawIndexedIndirect(IRHIBuffer* indirectBuffer, uint64_t offset,
+                                     uint32_t drawCount, uint32_t stride) = 0;
+    virtual void PipelineBarrier(PipelineStage src, PipelineStage dst) = 0;
 };
 
 class IRHIDevice {
@@ -65,6 +88,10 @@ public:
     // ---- 资源创建 ----
     virtual std::unique_ptr<IRHIBuffer>  CreateBuffer(const BufferDesc& desc, const void* initialData = nullptr) = 0;
     virtual std::unique_ptr<IRHIPipeline> CreatePipeline(const PipelineDesc& desc) = 0;
+    virtual std::unique_ptr<IRHIPipeline> CreateComputePipeline(const ComputePipelineDesc& desc) = 0;
+    virtual std::unique_ptr<IRHIDescriptorSet> CreateDescriptorSet(
+        const DescriptorSetLayoutDesc& layout,
+        const std::vector<DescriptorBufferBinding>& bindings) = 0;
 
     // ---- 交换链/帧 ----
     virtual uint32_t GetFramesInFlight() const = 0;

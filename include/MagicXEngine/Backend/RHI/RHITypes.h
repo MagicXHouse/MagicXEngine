@@ -29,6 +29,7 @@ enum class Format {
 enum class ShaderStage {
     Vertex = 0,
     Fragment = 1,
+    Compute = 2,
 };
 
 enum class BufferUsage : uint32_t {
@@ -37,6 +38,8 @@ enum class BufferUsage : uint32_t {
     Uniform     = 1u << 2,
     TransferSrc = 1u << 3,
     TransferDst = 1u << 4,
+    Storage     = 1u << 5,
+    Indirect    = 1u << 6,
 };
 
 inline BufferUsage operator|(BufferUsage a, BufferUsage b) {
@@ -83,6 +86,50 @@ struct BufferDesc {
     uint64_t    size         = 0;
     BufferUsage usage        = BufferUsage::Vertex;
     bool        cpuAccessible = false;  // true: 主机可见内存（可 Map/Unmap）
+};
+
+// ===========================================================================
+// 计算管线与描述符（GPU-Driven 基础：SSBO / compute / 间接绘制）
+// ===========================================================================
+
+// 描述符类型（当前只支持缓冲类）
+enum class DescriptorType {
+    StorageBuffer = 0,  // 结构化存储缓冲（SSBO，可读写）
+    UniformBuffer = 1,  // 只读常量缓冲（UBO）
+};
+
+// 描述符集合中的单个绑定声明
+struct DescriptorBinding {
+    uint32_t       binding = 0;
+    DescriptorType type    = DescriptorType::StorageBuffer;
+    ShaderStage    stage   = ShaderStage::Compute; // 该绑定可见的着色器阶段
+};
+
+// 描述符集合布局：一组绑定
+struct DescriptorSetLayoutDesc {
+    std::vector<DescriptorBinding> bindings;
+};
+
+// 计算管线描述（与图形管线 PipelineDesc 并列）
+struct ComputePipelineDesc {
+    ShaderDesc            shader;              // 单个 compute shader
+    DescriptorSetLayoutDesc descriptorSetLayout;
+    uint32_t              pushConstantSize = 0;
+};
+
+// 简化的管线阶段（用于命令缓冲屏障；后续按需扩展）
+enum class PipelineStage {
+    Compute = 0,
+    DrawIndirect = 1,
+};
+
+// 索引间接绘制命令（与 VkDrawIndexedIndirectCommand / D3D12 DrawIndexedArguments 布局一致，20 字节）
+struct DrawIndexedIndirectCommand {
+    uint32_t indexCount    = 0;
+    uint32_t instanceCount = 0;
+    uint32_t firstIndex    = 0;
+    int32_t  vertexOffset  = 0;
+    uint32_t firstInstance = 0;
 };
 
 } // namespace MagicXEngine::RHI

@@ -36,13 +36,21 @@ public:
     void DrawIndexed(uint32_t indexCount, uint32_t instanceCount,
                      uint32_t firstIndex, int32_t vertexOffset, uint32_t firstInstance) override;
     void PushConstants(const void* data, uint32_t size, uint32_t offset) override;
+    void BindComputePipeline(IRHIPipeline* pipeline) override;
+    void BindDescriptorSet(IRHIDescriptorSet* set) override;
+    void Dispatch(uint32_t groupX, uint32_t groupY, uint32_t groupZ) override;
+    void DrawIndexedIndirect(IRHIBuffer* indirectBuffer, uint64_t offset,
+                             uint32_t drawCount, uint32_t stride) override;
+    void PipelineBarrier(PipelineStage src, PipelineStage dst) override;
 
     VkCommandBuffer GetHandle() const { return m_cmd; }
 
 private:
     VulkanRenderContext* m_ctx;
     VkCommandBuffer      m_cmd;
-    VkPipelineLayout     m_currentLayout = VK_NULL_HANDLE;
+    VkPipelineLayout     m_currentLayout    = VK_NULL_HANDLE;
+    VkPipelineBindPoint  m_currentBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+    VkShaderStageFlags   m_currentPushStage = VK_SHADER_STAGE_VERTEX_BIT;
 };
 
 class VulkanDevice : public IRHIDevice {
@@ -53,6 +61,10 @@ public:
     // IRHIDevice
     std::unique_ptr<IRHIBuffer>   CreateBuffer(const BufferDesc& desc, const void* initialData) override;
     std::unique_ptr<IRHIPipeline> CreatePipeline(const PipelineDesc& desc) override;
+    std::unique_ptr<IRHIPipeline> CreateComputePipeline(const ComputePipelineDesc& desc) override;
+    std::unique_ptr<IRHIDescriptorSet> CreateDescriptorSet(
+        const DescriptorSetLayoutDesc& layout,
+        const std::vector<DescriptorBufferBinding>& bindings) override;
 
     uint32_t GetFramesInFlight() const override { return kFramesInFlight; }
     Format   GetSwapchainFormat() const override;
