@@ -72,7 +72,6 @@ embed_shader(${SHADER_DIR}/triangle.frag triangle_frag_spv ${GENERATED_DIR}/tria
 # ---------------------------------------------------------------------------
 file(GLOB_RECURSE ENGINE_SOURCES CONFIGURE_DEPENDS
   ${CMAKE_SOURCE_DIR}/src/Core/*.cpp
-  ${CMAKE_SOURCE_DIR}/src/Frontend/*.cpp
   ${CMAKE_SOURCE_DIR}/src/Backend/*.cpp
   ${CMAKE_SOURCE_DIR}/src/Engine.cpp
 )
@@ -84,7 +83,7 @@ add_library(MagicXEngine STATIC
 )
 
 target_include_directories(MagicXEngine
-  PUBLIC  ${CMAKE_SOURCE_DIR}/src
+  PUBLIC  ${CMAKE_SOURCE_DIR}/include
   PRIVATE ${GENERATED_DIR}
 )
 
@@ -112,8 +111,8 @@ function(add_case NAME SOURCE)
     FOLDER "Cases")
 endfunction()
 
-add_case(Case01_Triangle ${CMAKE_SOURCE_DIR}/src/Cases/Case01_Triangle.cpp)
-# 后续新增案例：add_case(Case02_XXX ${CMAKE_SOURCE_DIR}/src/Cases/Case02_XXX.cpp)
+add_case(Case01_Triangle ${CMAKE_SOURCE_DIR}/cases/Case01_Triangle.cpp)
+# 后续新增案例：add_case(Case02_XXX ${CMAKE_SOURCE_DIR}/cases/Case02_XXX.cpp)
 
 # VS 默认启动项目
 set_property(DIRECTORY PROPERTY VS_STARTUP_PROJECT Case01_Triangle)

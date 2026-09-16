@@ -1,4 +1,4 @@
-#include "Window.h"
+#include "MagicXEngine/Core/Window.h"
 
 #include <GLFW/glfw3.h>
 #include <stdexcept>
@@ -73,3 +73,4 @@ std::vector<const char*> Window::GetRequiredInstanceExtensions() const {
 }
 
 } // namespace MagicXEngine::Core
+

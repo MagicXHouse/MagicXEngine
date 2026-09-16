@@ -1,9 +1,9 @@
-#include "Engine.h"
+#include "MagicXEngine/Engine.h"
 
-#include "Backend/RenderScene.h"
-#include "Backend/RHI/RHI.h"
-#include "Core/Logger.h"
-#include "Core/Window.h"
+#include "MagicXEngine/Backend/RenderScene.h"
+#include "MagicXEngine/Backend/RHI/RHI.h"
+#include "MagicXEngine/Core/Logger.h"
+#include "MagicXEngine/Core/Window.h"
 
 #include <exception>
 
@@ -48,3 +48,4 @@ int RunScene(const Frontend::Scene& scene, const std::string& title) {
 }
 
 } // namespace MagicXEngine
+

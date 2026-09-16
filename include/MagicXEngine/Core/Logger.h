@@ -13,3 +13,4 @@ inline void LogWarn(const std::string& m)  { Log(LogLevel::Warn, m); }
 inline void LogError(const std::string& m) { Log(LogLevel::Error, m); }
 
 } // namespace MagicXEngine::Core
+

@@ -1,4 +1,4 @@
-#include "Logger.h"
+#include "MagicXEngine/Core/Logger.h"
 #include <cstdio>
 
 namespace MagicXEngine::Core {
@@ -16,3 +16,4 @@ void Log(LogLevel level, const std::string& message) {
 }
 
 } // namespace MagicXEngine::Core
+

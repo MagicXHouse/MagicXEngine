@@ -22,24 +22,24 @@ MagicXEngine/
 ├── cmake/embed_shader.cmake    # SPIR-V 内嵌为 C++ 字节数组
 ├── shaders/                    # GLSL 源文件
 ├── third_party/glfw/           # 内置的 GLFW 3.4（离线可编译）
-└── src/
-    ├── Engine.{h,cpp}          # RunScene：窗口 + RHI 设备 + RenderScene + 渲染循环
-    ├── Core/                   # 基础工具（窗口 / 日志 / 数学）
-    │   ├── Window.{h,cpp}
-    │   ├── Logger.{h,cpp}
-    │   └── Math.h              # Vec3 / Mat4 / LookAt / Perspective
-    ├── Frontend/               # ★ 前端：用户描述场景
-    │   ├── Mesh.h              #   Vertex（位置+颜色）/ MeshData（顶点+索引）
-    │   ├── Transform.h         #   位置 / 旋转 / 缩放 → 模型矩阵
-    │   ├── Camera.h            #   相机（屏幕空间 / 透视）
-    │   └── Scene.h             #   SceneObject / Scene
-    ├── Backend/                # ★ 后端
-    │   ├── RenderScene.{h,cpp} #   管理前端数据、上传 GPU、每帧渲染
-    │   └── RHI/                #   RHI 抽象 + Vulkan 实现
-    │       ├── RHITypes.h / RHI.h / RHI.cpp
-    │       └── Vulkan/         #   VulkanRHI / Swapchain / Pipeline / Buffer
-    └── Cases/                  # ★ 案例层（每个 case 一个可执行文件）
-        └── Case01_Triangle.cpp # 彩色三角形
+├── include/                    # ★ 头文件（声明/接口）
+│   └── MagicXEngine/
+│       ├── Engine.h
+│       ├── Core/               #   Window.h / Logger.h / Math.h
+│       ├── Frontend/           #   Mesh.h / Transform.h / Camera.h / Scene.h
+│       └── Backend/
+│           ├── RenderScene.h
+│           └── RHI/            #   RHITypes.h / RHI.h
+│               └── Vulkan/     #   Vulkan*.h
+├── src/                        # ★ 源文件（实现）
+│   ├── Engine.cpp
+│   ├── Core/                   #   Window.cpp / Logger.cpp
+│   └── Backend/
+│       ├── RenderScene.cpp
+│       └── RHI/                #   RHI.cpp
+│           └── Vulkan/         #   Vulkan*.cpp
+└── cases/                      # ★ 案例层（每个 case 一个可执行文件）
+    └── Case01_Triangle.cpp     # 彩色三角形
 ```
 
 ## 依赖
@@ -63,7 +63,7 @@ cmake --build build --config Release
 
 ## 新增一个案例
 
-1. 在 `src/Cases/` 下新建 `Case02_XXX.cpp`：
+1. 在 `cases/` 下新建 `Case02_XXX.cpp`：
    ```cpp
    #include "Engine.h"
    #include "Frontend/Scene.h"
@@ -74,7 +74,7 @@ cmake --build build --config Release
        return RunScene(scene, "Case02 - XXX");
    }
    ```
-2. 在 `CMakeLists.txt` 加一行：`add_case(Case02_XXX ${CMAKE_SOURCE_DIR}/src/Cases/Case02_XXX.cpp)`
+2. 在 `CMakeLists.txt` 加一行：`add_case(Case02_XXX ${CMAKE_SOURCE_DIR}/cases/Case02_XXX.cpp)`
 3. 重新 configure 后，在 VS 里右键 `Case02_XXX` →「设为启动项目」即可独立运行。
 
 ## 后端扩展（RHI）
@@ -91,3 +91,4 @@ cmake --build build --config Release
 - 校验层默认开启（`MAGICXENGINE_ENABLE_VALIDATION=ON`）。
 - transform 经 MVP 矩阵（push constant）传到着色器，前端设置的位移/旋转/缩放真正生效。
 - 交换链在窗口尺寸变化或 `OUT_OF_DATE` 时自动重建。
+

@@ -1,6 +1,6 @@
 #pragma once
 #include <string>
-#include "Frontend/Scene.h"
+#include "MagicXEngine/Frontend/Scene.h"
 
 namespace MagicXEngine {
 
@@ -9,3 +9,4 @@ namespace MagicXEngine {
 int RunScene(const Frontend::Scene& scene, const std::string& title = "MagicXEngine");
 
 } // namespace MagicXEngine
+
