@@ -14,6 +14,20 @@ option(MAGICXENGINE_ENABLE_VALIDATION "Enable Vulkan validation layers" ON)
 # Vulkan SDK (provides vulkan.h, vulkan-1.lib, glslc). Requires VULKAN_SDK env
 # var or the SDK on PATH. Install via: winget install KhronosGroup.VulkanSDK
 # ---------------------------------------------------------------------------
+if(NOT DEFINED ENV{VULKAN_SDK})
+  # VULKAN_SDK 未设置时，在 Windows 默认安装目录自动查找最新版本
+  if(WIN32 AND EXISTS "C:/VulkanSDK")
+    file(GLOB _vulkan_sdk_versions "C:/VulkanSDK/*")
+    list(SORT _vulkan_sdk_versions COMPARE NATURAL ORDER DESCENDING)
+    foreach(_vulkan_sdk_dir IN LISTS _vulkan_sdk_versions)
+      if(EXISTS "${_vulkan_sdk_dir}/Include/vulkan/vulkan.h")
+        set(ENV{VULKAN_SDK} "${_vulkan_sdk_dir}")
+        message(STATUS "Auto-detected VULKAN_SDK = ${_vulkan_sdk_dir}")
+        break()
+      endif()
+    endforeach()
+  endif()
+endif()
 find_package(Vulkan REQUIRED)
 
 # ---------------------------------------------------------------------------
