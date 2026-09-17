@@ -9,7 +9,8 @@ namespace MagicXEngine::Frontend {
 // 渲染模式：Direct = CPU 逐对象直绘；Indirect = GPU 驱动（compute 生成间接绘制命令）
 enum class RenderMode {
     Direct = 0,
-    Indirect = 1,
+    Indirect = 1,   // GPU 驱动冒烟测试（compute 写固定命令）
+    Meshlet = 2,    // meshlet 逐块视锥剔除 + 间接绘制
 };
 
 // 场景对象：一个网格 + 一个变换

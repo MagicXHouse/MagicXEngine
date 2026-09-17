@@ -141,5 +141,59 @@ inline Mat4 Orthographic(float left, float right, float bottom, float top,
     return r;
 }
 
+// ===========================================================================
+// 平面与视锥体（用于视锥剔除）
+// ===========================================================================
+
+// 平面：normal·p + d = 0（normal 为单位法线）
+struct Plane {
+    Vec3 normal{ 0.0f, 0.0f, 1.0f };
+    float d = 0.0f;
+};
+
+// 视锥体：6 个平面（法线指向内部）。点 p 在内部 iff 对所有平面 normal·p + d >= 0
+struct Frustum {
+    Plane planes[6];
+};
+
+// 点到平面的带符号距离（正 = 内部）
+inline float PlaneDistance(const Plane& p, const Vec3& point) {
+    return Dot(p.normal, point) + p.d;
+}
+
+// 包围球 vs 视锥体：完全在外返回 true（用于剔除）
+inline bool SphereOutsideFrustum(const Frustum& f, const Vec3& center, float radius) {
+    for (const Plane& p : f.planes) {
+        if (PlaneDistance(p, center) < -radius) return true;
+    }
+    return false;
+}
+
+// Gribb-Hartmann：从 view*proj 矩阵提取 6 个视锥平面（法线向内，已归一化）
+inline Frustum ExtractFrustumPlanes(const Mat4& vp) {
+    const float* m = vp.m;
+    // 列主序 m[col*4+row]，行向量：
+    //   row0 = (m[0], m[4], m[8],  m[12])
+    //   row1 = (m[1], m[5], m[9],  m[13])
+    //   row2 = (m[2], m[6], m[10], m[14])
+    //   row3 = (m[3], m[7], m[11], m[15])
+    const float rows[6][4] = {
+        { m[3]+m[0],  m[7]+m[4],  m[11]+m[8],  m[15]+m[12] }, // left  = row3 + row0
+        { m[3]-m[0],  m[7]-m[4],  m[11]-m[8],  m[15]-m[12] }, // right = row3 - row0
+        { m[3]+m[1],  m[7]+m[5],  m[11]+m[9],  m[15]+m[13] }, // bottom= row3 + row1
+        { m[3]-m[1],  m[7]-m[5],  m[11]-m[9],  m[15]-m[13] }, // top   = row3 - row1
+        { m[3]+m[2],  m[7]+m[6],  m[11]+m[10], m[15]+m[14] }, // near  = row3 + row2
+        { m[3]-m[2],  m[7]-m[6],  m[11]-m[10], m[15]-m[14] }, // far   = row3 - row2
+    };
+    Frustum f;
+    for (int i = 0; i < 6; ++i) {
+        const float len = std::sqrt(rows[i][0]*rows[i][0] + rows[i][1]*rows[i][1] + rows[i][2]*rows[i][2]);
+        const float inv = (len > 1e-8f) ? 1.0f / len : 1.0f;
+        f.planes[i].normal = { rows[i][0] * inv, rows[i][1] * inv, rows[i][2] * inv };
+        f.planes[i].d      = rows[i][3] * inv;
+    }
+    return f;
+}
+
 } // namespace MagicXEngine::Math
 

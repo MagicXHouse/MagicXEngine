@@ -45,6 +45,10 @@ private:
     void RenderIndirect(RHI::IRHICommandBuffer* cmd, float aspect, uint32_t w, uint32_t h,
                         const std::function<void()>& uiRender);
 
+    // Meshlet 模式：compute 逐 meshlet 视锥剔除 → 间接绘制
+    void RenderMeshlet(RHI::IRHICommandBuffer* cmd, float aspect, uint32_t w, uint32_t h,
+                       const std::function<void()>& uiRender);
+
     // 投影矩阵（透视相机时应用 Vulkan NDC Y 翻转）
     Math::Mat4 ComputeProjection(float aspect) const;
 
@@ -58,6 +62,11 @@ private:
     std::unique_ptr<RHI::IRHIPipeline>      m_computePipeline;
     std::unique_ptr<RHI::IRHIDescriptorSet> m_descriptorSet;
     std::unique_ptr<RHI::IRHIBuffer>        m_indirectBuffer;
+
+    // meshlet 资源
+    std::unique_ptr<RHI::IRHIBuffer> m_meshletBuffer;      // meshlet 描述 SSBO
+    std::unique_ptr<RHI::IRHIBuffer> m_meshletIndexBuffer; // 重排后的索引缓冲
+    uint32_t m_meshletCount = 0;
 };
 
 } // namespace MagicXEngine::Backend

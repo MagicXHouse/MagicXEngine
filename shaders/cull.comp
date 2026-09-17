@@ -9,17 +9,52 @@ struct DrawIndexedIndirectCommand {
     uint firstInstance;
 };
 
-layout(std430, set = 0, binding = 0) buffer IndirectBuffer {
-    DrawIndexedIndirectCommand cmd;
-} indirect;
+// meshlet 描述，与 C 侧 Meshlet（48 字节，std430）一致
+struct Meshlet {
+    uint firstIndex;     // 在 meshlet 索引缓冲中的起始
+    uint indexCount;     // 索引数量
+    uint _pad0;          // 对齐到 vec4
+    uint _pad1;
+    vec4 boundingSphere; // xyz=中心, w=半径
+    vec4 coneAxis;       // xyz=轴, w=cos(半角)（T9 暂未用于剔除）
+};
 
-layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
+// 剔除参数（push constant）
+layout(push_constant) uniform PC {
+    vec4 planes[6];      // 6 个视锥平面（模型空间，法线向内，已归一化）
+    uint meshletCount;
+} pc;
+
+layout(std430, set = 0, binding = 0) buffer MeshletBuffer {
+    Meshlet meshlets[];
+};
+
+layout(std430, set = 0, binding = 1) buffer IndirectBuffer {
+    DrawIndexedIndirectCommand commands[];
+};
+
+layout(local_size_x = 64) in;
 
 void main() {
-    // 固定写一条命令：画一个三角形（3 个索引）
-    indirect.cmd.indexCount    = 3;
-    indirect.cmd.instanceCount = 1;
-    indirect.cmd.firstIndex    = 0;
-    indirect.cmd.vertexOffset  = 0;
-    indirect.cmd.firstInstance = 0;
+    uint i = gl_GlobalInvocationID.x;
+    if (i >= pc.meshletCount) return;
+
+    Meshlet m = meshlets[i];
+
+    // 视锥剔除：包围球 vs 6 平面（dist < -radius 则在平面外侧）
+    bool visible = true;
+    for (int p = 0; p < 6; ++p) {
+        float dist = dot(pc.planes[p].xyz, m.boundingSphere.xyz) + pc.planes[p].w;
+        if (dist < -m.boundingSphere.w) {
+            visible = false;
+            break;
+        }
+    }
+
+    // 写间接绘制命令：可见则 instanceCount=3，否则 0（跳过绘制）
+    commands[i].indexCount    = m.indexCount;
+    commands[i].instanceCount = visible ? 3u : 0u;
+    commands[i].firstIndex    = m.firstIndex;
+    commands[i].vertexOffset  = 0;
+    commands[i].firstInstance = 0;
 }

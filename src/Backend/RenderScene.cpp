@@ -1,5 +1,6 @@
 #include "MagicXEngine/Backend/RenderScene.h"
 
+#include "MagicXEngine/Backend/MeshletBuilder.h"
 #include "MagicXEngine/Backend/RHI/RHI.h"
 
 #include "triangle_vert_spv.h"
@@ -11,6 +12,13 @@
 namespace MagicXEngine::Backend {
 
 using namespace RHI;
+
+// 剔除参数（push constant，与 cull.comp 的 PC 布局一致，100 字节）
+struct MeshletCullParams {
+    Math::Frustum frustum;      // 6 个视锥平面（模型空间，法线向内，已归一化）
+    uint32_t      meshletCount;
+};
+static_assert(sizeof(MeshletCullParams) == 100, "MeshletCullParams 应为 100 字节");
 
 RenderScene::RenderScene(RHI::IRHIDevice* device) : m_device(device) {}
 
@@ -107,6 +115,58 @@ void RenderScene::Load(const Frontend::Scene& scene) {
         layout.bindings = { { 0, DescriptorType::StorageBuffer, ShaderStage::Compute } };
         std::vector<DescriptorBufferBinding> bindings = { { 0, m_indirectBuffer.get() } };
         m_descriptorSet = m_device->CreateDescriptorSet(layout, bindings);
+    } else if (m_renderMode == Frontend::RenderMode::Meshlet) {
+        // ---- meshlet 逐块视锥剔除资源 ----
+        if (scene.objects.empty()) return;
+
+        // 1) 构建 meshlet（贪心 BFS，不重排顶点）
+        const MeshletBuildResult build = BuildMeshlets(scene.objects[0].mesh, 64, 126);
+        m_meshletCount = static_cast<uint32_t>(build.meshlets.size());
+
+        // 2) 上传 meshlet 描述 SSBO
+        BufferDesc mbDesc;
+        mbDesc.size  = build.meshlets.size() * sizeof(Meshlet);
+        mbDesc.usage = BufferUsage::Storage;
+        m_meshletBuffer = m_device->CreateBuffer(mbDesc, build.meshlets.data());
+
+        // 3) 上传重排后的索引缓冲（渲染时作为 index buffer）
+        BufferDesc ibDesc;
+        ibDesc.size          = build.meshletIndices.size() * sizeof(uint32_t);
+        ibDesc.usage         = BufferUsage::Index;
+        ibDesc.cpuAccessible = true;
+        m_meshletIndexBuffer = m_device->CreateBuffer(ibDesc, build.meshletIndices.data());
+
+        // 4) 间接命令缓冲（每 meshlet 一条，compute 每帧写入）
+        BufferDesc cmdDesc;
+        cmdDesc.size  = m_meshletCount * sizeof(DrawIndexedIndirectCommand);
+        cmdDesc.usage = BufferUsage::Storage | BufferUsage::Indirect;
+        m_indirectBuffer = m_device->CreateBuffer(cmdDesc, nullptr);
+
+        // 5) compute 管线（2 个 SSBO：meshlets + indirect commands）
+        ComputePipelineDesc cdesc;
+        ShaderDesc cs;
+        cs.stage = ShaderStage::Compute;
+        cs.spirv.assign(MagicXEngine::Shaders::cull_comp_spv,
+                        MagicXEngine::Shaders::cull_comp_spv + MagicXEngine::Shaders::cull_comp_spv_word_count);
+        cdesc.shader = cs;
+        cdesc.descriptorSetLayout.bindings = {
+            { 0, DescriptorType::StorageBuffer, ShaderStage::Compute }, // meshlets
+            { 1, DescriptorType::StorageBuffer, ShaderStage::Compute }, // indirect commands
+        };
+        cdesc.pushConstantSize = sizeof(MeshletCullParams);
+        m_computePipeline = m_device->CreateComputePipeline(cdesc);
+
+        // 6) 描述符集合：绑定两个 SSBO
+        DescriptorSetLayoutDesc layout;
+        layout.bindings = {
+            { 0, DescriptorType::StorageBuffer, ShaderStage::Compute },
+            { 1, DescriptorType::StorageBuffer, ShaderStage::Compute },
+        };
+        std::vector<DescriptorBufferBinding> bindings = {
+            { 0, m_meshletBuffer.get() },
+            { 1, m_indirectBuffer.get() },
+        };
+        m_descriptorSet = m_device->CreateDescriptorSet(layout, bindings);
     }
 }
 
@@ -127,6 +187,10 @@ void RenderScene::Render(uint32_t frameIndex, const std::function<void()>& uiRen
 
     if (m_renderMode == Frontend::RenderMode::Indirect) {
         RenderIndirect(cmd, aspect, w, h, uiRender);
+        return;
+    }
+    if (m_renderMode == Frontend::RenderMode::Meshlet) {
+        RenderMeshlet(cmd, aspect, w, h, uiRender);
         return;
     }
 
@@ -187,6 +251,52 @@ void RenderScene::RenderIndirect(RHI::IRHICommandBuffer* cmd, float aspect,
         cmd->BindIndexBuffer(obj.indexBuffer.get(), 0);
     }
     cmd->DrawIndexedIndirect(m_indirectBuffer.get(), 0, 1, sizeof(DrawIndexedIndirectCommand));
+
+    if (uiRender) uiRender();
+    cmd->EndRenderPass();
+}
+
+void RenderScene::RenderMeshlet(RHI::IRHICommandBuffer* cmd, float aspect,
+                                uint32_t w, uint32_t h,
+                                const std::function<void()>& uiRender) {
+    if (m_objects.empty() || m_meshletCount == 0) {
+        cmd->BeginRenderPass();
+        if (uiRender) uiRender();
+        cmd->EndRenderPass();
+        return;
+    }
+
+    const GpuObject& obj = m_objects[0];
+
+    // 1) compute 在 render pass 外：逐 meshlet 视锥剔除
+    {
+        MeshletCullParams params{};
+        // 视锥平面在模型空间：用 OpenGL 惯例 VP = proj * view * model（Gribb-Hartmann 提取）
+        const Math::Mat4 rawProj = m_camera.Projection(aspect);
+        const Math::Mat4 model   = obj.transform.Matrix();
+        params.frustum      = Math::ExtractFrustumPlanes(rawProj * m_camera.View() * model);
+        params.meshletCount = m_meshletCount;
+
+        cmd->BindComputePipeline(m_computePipeline.get());
+        cmd->BindDescriptorSet(m_descriptorSet.get());
+        cmd->PushConstants(&params, sizeof(params));
+        cmd->Dispatch((m_meshletCount + 63) / 64, 1, 1);
+    }
+
+    // 2) 同步：compute 写 indirect buffer → 间接绘制读
+    cmd->PipelineBarrier(PipelineStage::Compute, PipelineStage::DrawIndirect);
+
+    // 3) 图形侧：一次间接绘制所有 meshlet
+    cmd->BeginRenderPass();
+    cmd->BindPipeline(m_pipeline.get());
+    cmd->SetViewport(0.0f, 0.0f, static_cast<float>(w), static_cast<float>(h));
+    cmd->SetScissor(0, 0, w, h);
+
+    const Math::Mat4 mvp = ComputeProjection(aspect) * m_camera.View() * obj.transform.Matrix();
+    cmd->PushConstants(&mvp, sizeof(mvp));
+    cmd->BindVertexBuffer(obj.vertexBuffer.get(), 0);
+    cmd->BindIndexBuffer(m_meshletIndexBuffer.get(), 0);
+    cmd->DrawIndexedIndirect(m_indirectBuffer.get(), 0, m_meshletCount, sizeof(DrawIndexedIndirectCommand));
 
     if (uiRender) uiRender();
     cmd->EndRenderPass();
