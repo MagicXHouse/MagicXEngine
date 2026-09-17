@@ -18,6 +18,40 @@ inline Edge MakeEdge(uint32_t a, uint32_t b) {
 
 } // namespace
 
+BoundingSphere ComputeBoundingSphere(const Frontend::MeshData& mesh) {
+    BoundingSphere s;
+    if (mesh.vertices.empty()) return s;
+
+    Math::Vec3 center{ 0.0f, 0.0f, 0.0f };
+    for (const auto& v : mesh.vertices) center = center + v.position;
+    center = center * (1.0f / static_cast<float>(mesh.vertices.size()));
+
+    float radiusSq = 0.0f;
+    for (const auto& v : mesh.vertices) {
+        const Math::Vec3 d = v.position - center;
+        radiusSq = std::max(radiusSq, Dot(d, d));
+    }
+    s.center = center;
+    s.radius = std::sqrt(radiusSq);
+    return s;
+}
+
+Frontend::MeshData FlattenObjects(const std::vector<Frontend::SceneObject>& objects) {
+    Frontend::MeshData combined;
+    uint32_t vertexBase = 0;
+    for (const auto& obj : objects) {
+        const Math::Mat4 model = obj.transform.Matrix();
+        for (const auto& v : obj.mesh.vertices) {
+            combined.vertices.push_back({ Math::TransformPoint(model, v.position), v.color });
+        }
+        for (uint32_t idx : obj.mesh.indices) {
+            combined.indices.push_back(vertexBase + idx);
+        }
+        vertexBase += static_cast<uint32_t>(obj.mesh.vertices.size());
+    }
+    return combined;
+}
+
 MeshletBuildResult BuildMeshlets(const Frontend::MeshData& mesh,
                                  uint32_t maxVerts, uint32_t maxTris) {
     MeshletBuildResult result;

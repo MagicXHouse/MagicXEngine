@@ -11,6 +11,7 @@ enum class RenderMode {
     Direct = 0,
     Indirect = 1,   // GPU 驱动冒烟测试（compute 写固定命令）
     Meshlet = 2,    // meshlet 逐块视锥剔除 + 间接绘制
+    Culled = 3,     // CPU 逐对象视锥剔除 + 直绘（普通剔除基线）
 };
 
 // 场景对象：一个网格 + 一个变换

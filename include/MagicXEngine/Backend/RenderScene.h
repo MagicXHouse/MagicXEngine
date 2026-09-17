@@ -3,6 +3,7 @@
 #include <functional>
 #include <memory>
 #include <vector>
+#include "MagicXEngine/Backend/MeshletBuilder.h"
 #include "MagicXEngine/Frontend/Scene.h"
 
 namespace MagicXEngine::RHI {
@@ -38,6 +39,7 @@ private:
         std::unique_ptr<RHI::IRHIBuffer> indexBuffer;
         uint32_t          vertexCount = 0;
         uint32_t          indexCount  = 0;
+        BoundingSphere    bounds;      // 模型空间包围球（普通剔除用）
         Frontend::Transform transform;
     };
 
@@ -48,6 +50,10 @@ private:
     // Meshlet 模式：compute 逐 meshlet 视锥剔除 → 间接绘制
     void RenderMeshlet(RHI::IRHICommandBuffer* cmd, float aspect, uint32_t w, uint32_t h,
                        const std::function<void()>& uiRender);
+
+    // Culled 模式：CPU 逐对象视锥剔除 + 直绘（普通剔除基线）
+    void RenderCulled(RHI::IRHICommandBuffer* cmd, float aspect, uint32_t w, uint32_t h,
+                      const std::function<void()>& uiRender);
 
     // 投影矩阵（透视相机时应用 Vulkan NDC Y 翻转）
     Math::Mat4 ComputeProjection(float aspect) const;
@@ -64,8 +70,9 @@ private:
     std::unique_ptr<RHI::IRHIBuffer>        m_indirectBuffer;
 
     // meshlet 资源
-    std::unique_ptr<RHI::IRHIBuffer> m_meshletBuffer;      // meshlet 描述 SSBO
-    std::unique_ptr<RHI::IRHIBuffer> m_meshletIndexBuffer; // 重排后的索引缓冲
+    std::unique_ptr<RHI::IRHIBuffer> m_meshletBuffer;        // meshlet 描述 SSBO
+    std::unique_ptr<RHI::IRHIBuffer> m_meshletIndexBuffer;   // 重排后的索引缓冲
+    std::unique_ptr<RHI::IRHIBuffer> m_flattenedVertexBuffer; // 平铺后的世界空间顶点缓冲
     uint32_t m_meshletCount = 0;
 };
 

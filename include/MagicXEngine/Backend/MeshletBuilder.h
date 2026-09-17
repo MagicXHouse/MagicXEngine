@@ -3,6 +3,7 @@
 #include <vector>
 #include "MagicXEngine/Core/Math.h"
 #include "MagicXEngine/Frontend/Mesh.h"
+#include "MagicXEngine/Frontend/Scene.h"
 
 namespace MagicXEngine::Backend {
 
@@ -26,6 +27,18 @@ struct MeshletBuildResult {
     std::vector<Meshlet>    meshlets;
     std::vector<uint32_t>  meshletIndices;
 };
+
+// 包围球（模型空间）
+struct BoundingSphere {
+    Math::Vec3 center;
+    float radius = 0.0f;
+};
+
+// 计算网格的包围球（中心 = 顶点均值，半径 = 最大距离）
+BoundingSphere ComputeBoundingSphere(const Frontend::MeshData& mesh);
+
+// 把多个对象平铺到世界空间的单一网格（用各对象的 transform 变换顶点）
+Frontend::MeshData FlattenObjects(const std::vector<Frontend::SceneObject>& objects);
 
 // 贪心 BFS 构建 meshlet（不重排顶点）。maxVerts/maxTris 为每个 meshlet 的顶点/三角形上限。
 MeshletBuildResult BuildMeshlets(const Frontend::MeshData& mesh,

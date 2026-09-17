@@ -114,6 +114,17 @@ inline Mat4 LookAt(const Vec3& eye, const Vec3& target, const Vec3& up) {
     return r;
 }
 
+// 变换点（含透视除法；仿射变换下 w=1）
+inline Vec3 TransformPoint(const Mat4& m, const Vec3& p) {
+    const float w = m.m[3] * p.x + m.m[7] * p.y + m.m[11] * p.z + m.m[15];
+    const float inv = (w != 0.0f) ? 1.0f / w : 1.0f;
+    return {
+        (m.m[0] * p.x + m.m[4] * p.y + m.m[8]  * p.z + m.m[12]) * inv,
+        (m.m[1] * p.x + m.m[5] * p.y + m.m[9]  * p.z + m.m[13]) * inv,
+        (m.m[2] * p.x + m.m[6] * p.y + m.m[10] * p.z + m.m[14]) * inv,
+    };
+}
+
 // 透视投影（OpenGL 惯例，Y 轴向上；Vulkan 需注意 NDC Y 翻转，demo 用屏幕空间相机规避）
 inline Mat4 Perspective(float fovYDeg, float aspect, float nearPlane, float farPlane) {
     constexpr float kPi = 3.14159265358979323846f;

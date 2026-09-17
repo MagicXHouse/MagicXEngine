@@ -7,6 +7,8 @@
 #include "triangle_frag_spv.h"
 #include "cull_comp_spv.h"
 
+#include <algorithm>
+#include <cmath>
 #include <cstddef>
 
 namespace MagicXEngine::Backend {
@@ -87,6 +89,7 @@ void RenderScene::Load(const Frontend::Scene& scene) {
         }
 
         g.transform = obj.transform;
+        g.bounds    = ComputeBoundingSphere(obj.mesh);
         m_objects.push_back(std::move(g));
     }
 
@@ -119,11 +122,19 @@ void RenderScene::Load(const Frontend::Scene& scene) {
         // ---- meshlet 逐块视锥剔除资源 ----
         if (scene.objects.empty()) return;
 
-        // 1) 构建 meshlet（贪心 BFS，不重排顶点）
-        const MeshletBuildResult build = BuildMeshlets(scene.objects[0].mesh, 64, 126);
+        // 1) 平铺所有对象到世界空间的单一网格 + 构建 meshlet
+        Frontend::MeshData combined = FlattenObjects(scene.objects);
+        const MeshletBuildResult build = BuildMeshlets(combined, 64, 126);
         m_meshletCount = static_cast<uint32_t>(build.meshlets.size());
 
-        // 2) 上传 meshlet 描述 SSBO
+        // 2) 上传平铺后的顶点缓冲（渲染时作为 vertex buffer）
+        BufferDesc vbDesc;
+        vbDesc.size          = combined.vertices.size() * sizeof(Frontend::Vertex);
+        vbDesc.usage         = BufferUsage::Vertex;
+        vbDesc.cpuAccessible = true;
+        m_flattenedVertexBuffer = m_device->CreateBuffer(vbDesc, combined.vertices.data());
+
+        // 3) 上传 meshlet 描述 SSBO
         BufferDesc mbDesc;
         mbDesc.size  = build.meshlets.size() * sizeof(Meshlet);
         mbDesc.usage = BufferUsage::Storage;
@@ -171,7 +182,8 @@ void RenderScene::Load(const Frontend::Scene& scene) {
 }
 
 void RenderScene::Update(const Frontend::Scene& scene) {
-    m_camera = scene.camera;
+    m_camera     = scene.camera;
+    m_renderMode = scene.renderMode;  // 支持运行时切换渲染模式
     // 同步对象变换（对象数量需与 Load 时一致）
     for (size_t i = 0; i < m_objects.size() && i < scene.objects.size(); ++i) {
         m_objects[i].transform = scene.objects[i].transform;
@@ -191,6 +203,10 @@ void RenderScene::Render(uint32_t frameIndex, const std::function<void()>& uiRen
     }
     if (m_renderMode == Frontend::RenderMode::Meshlet) {
         RenderMeshlet(cmd, aspect, w, h, uiRender);
+        return;
+    }
+    if (m_renderMode == Frontend::RenderMode::Culled) {
+        RenderCulled(cmd, aspect, w, h, uiRender);
         return;
     }
 
@@ -266,15 +282,11 @@ void RenderScene::RenderMeshlet(RHI::IRHICommandBuffer* cmd, float aspect,
         return;
     }
 
-    const GpuObject& obj = m_objects[0];
-
-    // 1) compute 在 render pass 外：逐 meshlet 视锥剔除
+    // 1) compute 在 render pass 外：逐 meshlet 视锥剔除（世界空间）
     {
         MeshletCullParams params{};
-        // 视锥平面在模型空间：用 OpenGL 惯例 VP = proj * view * model（Gribb-Hartmann 提取）
         const Math::Mat4 rawProj = m_camera.Projection(aspect);
-        const Math::Mat4 model   = obj.transform.Matrix();
-        params.frustum      = Math::ExtractFrustumPlanes(rawProj * m_camera.View() * model);
+        params.frustum      = Math::ExtractFrustumPlanes(rawProj * m_camera.View());
         params.meshletCount = m_meshletCount;
 
         cmd->BindComputePipeline(m_computePipeline.get());
@@ -292,11 +304,48 @@ void RenderScene::RenderMeshlet(RHI::IRHICommandBuffer* cmd, float aspect,
     cmd->SetViewport(0.0f, 0.0f, static_cast<float>(w), static_cast<float>(h));
     cmd->SetScissor(0, 0, w, h);
 
-    const Math::Mat4 mvp = ComputeProjection(aspect) * m_camera.View() * obj.transform.Matrix();
+    const Math::Mat4 mvp = ComputeProjection(aspect) * m_camera.View();  // 网格已在世界空间
     cmd->PushConstants(&mvp, sizeof(mvp));
-    cmd->BindVertexBuffer(obj.vertexBuffer.get(), 0);
+    cmd->BindVertexBuffer(m_flattenedVertexBuffer.get(), 0);
     cmd->BindIndexBuffer(m_meshletIndexBuffer.get(), 0);
     cmd->DrawIndexedIndirect(m_indirectBuffer.get(), 0, m_meshletCount, sizeof(DrawIndexedIndirectCommand));
+
+    if (uiRender) uiRender();
+    cmd->EndRenderPass();
+}
+
+void RenderScene::RenderCulled(RHI::IRHICommandBuffer* cmd, float aspect,
+                               uint32_t w, uint32_t h,
+                               const std::function<void()>& uiRender) {
+    // 世界空间视锥（普通剔除：对象包围球变换到世界空间后测试）
+    const Math::Mat4 rawProj = m_camera.Projection(aspect);
+    const Math::Frustum frustum = Math::ExtractFrustumPlanes(rawProj * m_camera.View());
+    const Math::Mat4 proj = ComputeProjection(aspect);
+
+    cmd->BeginRenderPass();
+    cmd->BindPipeline(m_pipeline.get());
+    cmd->SetViewport(0.0f, 0.0f, static_cast<float>(w), static_cast<float>(h));
+    cmd->SetScissor(0, 0, w, h);
+
+    for (const auto& obj : m_objects) {
+        const Math::Mat4 model = obj.transform.Matrix();
+        const Math::Vec3 centerW = Math::TransformPoint(model, obj.bounds.center);
+        const float maxScale = std::max({ std::abs(obj.transform.scale.x),
+                                          std::abs(obj.transform.scale.y),
+                                          std::abs(obj.transform.scale.z) });
+        const float radiusW = obj.bounds.radius * maxScale;
+        if (Math::SphereOutsideFrustum(frustum, centerW, radiusW)) continue;
+
+        const Math::Mat4 mvp = proj * m_camera.View() * model;
+        cmd->PushConstants(&mvp, sizeof(mvp));
+        cmd->BindVertexBuffer(obj.vertexBuffer.get(), 0);
+        if (obj.indexBuffer) {
+            cmd->BindIndexBuffer(obj.indexBuffer.get(), 0);
+            cmd->DrawIndexed(obj.indexCount);
+        } else {
+            cmd->Draw(obj.vertexCount);
+        }
+    }
 
     if (uiRender) uiRender();
     cmd->EndRenderPass();

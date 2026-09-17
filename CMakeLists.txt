@@ -133,6 +133,7 @@ add_case(Case01_Triangle ${CMAKE_SOURCE_DIR}/cases/Case01_Triangle.cpp)
 add_case(Case02_GPUDriven ${CMAKE_SOURCE_DIR}/cases/Case02_GPUDriven.cpp)
 add_case(Case03_Perspective ${CMAKE_SOURCE_DIR}/cases/Case03_Perspective.cpp)
 add_case(Case04_Meshlet ${CMAKE_SOURCE_DIR}/cases/Case04_Meshlet.cpp)
+add_case(Case05_Comparison ${CMAKE_SOURCE_DIR}/cases/Case05_Comparison.cpp)
 
 # VS 默认启动项目
 set_property(DIRECTORY PROPERTY VS_STARTUP_PROJECT Case01_Triangle)
