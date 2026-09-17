@@ -40,6 +40,22 @@ set(GLFW_INSTALL        OFF CACHE BOOL "" FORCE)
 add_subdirectory(${CMAKE_SOURCE_DIR}/third_party/glfw)
 
 # ---------------------------------------------------------------------------
+# ImGui（已内置，插件化 UI）
+# ---------------------------------------------------------------------------
+add_library(imgui STATIC
+  ${CMAKE_SOURCE_DIR}/third_party/imgui/imgui.cpp
+  ${CMAKE_SOURCE_DIR}/third_party/imgui/imgui_draw.cpp
+  ${CMAKE_SOURCE_DIR}/third_party/imgui/imgui_tables.cpp
+  ${CMAKE_SOURCE_DIR}/third_party/imgui/imgui_widgets.cpp
+  ${CMAKE_SOURCE_DIR}/third_party/imgui/backends/imgui_impl_vulkan.cpp
+)
+target_include_directories(imgui PUBLIC
+  ${CMAKE_SOURCE_DIR}/third_party/imgui
+  ${CMAKE_SOURCE_DIR}/third_party/imgui/backends
+)
+target_link_libraries(imgui PUBLIC Vulkan::Vulkan)
+
+# ---------------------------------------------------------------------------
 # 着色器：glslc 编译为 SPIR-V 并内嵌
 # ---------------------------------------------------------------------------
 set(SHADER_DIR    ${CMAKE_SOURCE_DIR}/shaders)
@@ -89,7 +105,7 @@ target_include_directories(MagicXEngine
   PRIVATE ${GENERATED_DIR}
 )
 
-target_link_libraries(MagicXEngine PUBLIC Vulkan::Vulkan glfw)
+target_link_libraries(MagicXEngine PUBLIC Vulkan::Vulkan glfw imgui)
 
 if(MAGICXENGINE_ENABLE_VALIDATION)
   target_compile_definitions(MagicXEngine PRIVATE MAGICXENGINE_ENABLE_VALIDATION=1)
@@ -115,6 +131,7 @@ endfunction()
 
 add_case(Case01_Triangle ${CMAKE_SOURCE_DIR}/cases/Case01_Triangle.cpp)
 add_case(Case02_GPUDriven ${CMAKE_SOURCE_DIR}/cases/Case02_GPUDriven.cpp)
+add_case(Case03_Perspective ${CMAKE_SOURCE_DIR}/cases/Case03_Perspective.cpp)
 
 # VS 默认启动项目
 set_property(DIRECTORY PROPERTY VS_STARTUP_PROJECT Case01_Triangle)

@@ -79,6 +79,8 @@ struct PipelineDesc {
     FrontFace   frontFace   = FrontFace::CounterClockwise;
     PolygonMode polygonMode = PolygonMode::Fill;
     bool        blendEnable = false;
+    bool        depthTestEnable  = false; // 深度测试（默认关，兼容原有案例）
+    bool        depthWriteEnable = false; // 深度写入
     uint32_t    pushConstantSize = 0; // >0: 顶点阶段 push constant 大小（字节），如 MVP 矩阵
 };
 

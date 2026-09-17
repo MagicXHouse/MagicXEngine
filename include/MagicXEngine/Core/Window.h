@@ -2,6 +2,7 @@
 #include <cstdint>
 #include <functional>
 #include <string>
+#include <unordered_set>
 #include <vector>
 
 struct GLFWwindow;
@@ -33,9 +34,20 @@ public:
     // Vulkan 实例需要从窗口系统获取的扩展名列表
     std::vector<const char*> GetRequiredInstanceExtensions() const;
 
+    // ---- 输入查询（键码/按钮码与 GLFW 一致，见 glfw3.h） ----
+    bool   IsKeyDown(int key) const;            // 键盘按键是否按住
+    bool   IsMouseButtonDown(int button) const; // 鼠标按键是否按住
+    void   GetMousePos(double& x, double& y) const; // 光标位置（窗口坐标，左上为原点）
+    double ConsumeScrollY();                    // 返回累计滚轮滚动量并清零
+
 private:
     GLFWwindow* m_handle = nullptr;
     bool m_wasResized = false;
+
+    std::unordered_set<int> m_keysDown;
+    std::unordered_set<int> m_mouseButtonsDown;
+    double m_mouseX = 0.0, m_mouseY = 0.0;
+    double m_scrollY = 0.0;
 };
 
 } // namespace MagicXEngine::Core

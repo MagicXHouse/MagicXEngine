@@ -117,15 +117,56 @@ void VulkanSwapchain::CreateSwapchain(uint32_t graphicsFamily, uint32_t presentF
     }
 }
 
+void VulkanSwapchain::CreateDepthResources() {
+    VkImageCreateInfo ci{};
+    ci.sType         = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+    ci.imageType     = VK_IMAGE_TYPE_2D;
+    ci.format        = VK_FORMAT_D32_SFLOAT;
+    ci.extent        = { m_extent.width, m_extent.height, 1 };
+    ci.mipLevels     = 1;
+    ci.arrayLayers   = 1;
+    ci.samples       = VK_SAMPLE_COUNT_1_BIT;
+    ci.tiling        = VK_IMAGE_TILING_OPTIMAL;
+    ci.usage         = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+    ci.sharingMode   = VK_SHARING_MODE_EXCLUSIVE;
+    ci.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    VkCheck(vkCreateImage(m_device, &ci, nullptr, &m_depthImage), "vkCreateImage (depth)");
+
+    VkMemoryRequirements memReq;
+    vkGetImageMemoryRequirements(m_device, m_depthImage, &memReq);
+    VkMemoryAllocateInfo ai{};
+    ai.sType           = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+    ai.allocationSize  = memReq.size;
+    ai.memoryTypeIndex = FindMemoryType(m_physical, memReq.memoryTypeBits,
+                                        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+    VkCheck(vkAllocateMemory(m_device, &ai, nullptr, &m_depthMemory), "vkAllocateMemory (depth)");
+    VkCheck(vkBindImageMemory(m_device, m_depthImage, m_depthMemory, 0), "vkBindImageMemory (depth)");
+
+    VkImageViewCreateInfo vi{};
+    vi.sType    = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+    vi.image    = m_depthImage;
+    vi.viewType = VK_IMAGE_VIEW_TYPE_2D;
+    vi.format   = VK_FORMAT_D32_SFLOAT;
+    vi.subresourceRange.aspectMask     = VK_IMAGE_ASPECT_DEPTH_BIT;
+    vi.subresourceRange.baseMipLevel   = 0;
+    vi.subresourceRange.levelCount     = 1;
+    vi.subresourceRange.baseArrayLayer = 0;
+    vi.subresourceRange.layerCount     = 1;
+    VkCheck(vkCreateImageView(m_device, &vi, nullptr, &m_depthImageView),
+            "vkCreateImageView (depth)");
+}
+
 void VulkanSwapchain::CreateFramebuffers(VkRenderPass renderPass) {
+    CreateDepthResources();
+
     m_framebuffers.resize(m_imageViews.size());
     for (size_t i = 0; i < m_imageViews.size(); ++i) {
-        VkImageView attachments[] = { m_imageViews[i] };
+        VkImageView attachments[] = { m_imageViews[i], m_depthImageView };
 
         VkFramebufferCreateInfo ci{};
         ci.sType           = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
         ci.renderPass      = renderPass;
-        ci.attachmentCount = 1;
+        ci.attachmentCount = 2;
         ci.pAttachments    = attachments;
         ci.width           = m_extent.width;
         ci.height          = m_extent.height;
@@ -144,6 +185,9 @@ void VulkanSwapchain::Destroy() {
         if (iv) vkDestroyImageView(m_device, iv, nullptr);
     }
     m_imageViews.clear();
+    if (m_depthImageView) { vkDestroyImageView(m_device, m_depthImageView, nullptr); m_depthImageView = VK_NULL_HANDLE; }
+    if (m_depthImage)     { vkDestroyImage(m_device, m_depthImage, nullptr); m_depthImage = VK_NULL_HANDLE; }
+    if (m_depthMemory)    { vkFreeMemory(m_device, m_depthMemory, nullptr); m_depthMemory = VK_NULL_HANDLE; }
     if (m_swapchain) {
         vkDestroySwapchainKHR(m_device, m_swapchain, nullptr);
         m_swapchain = VK_NULL_HANDLE;

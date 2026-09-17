@@ -18,6 +18,17 @@ struct VulkanRenderContext {
     uint32_t         imageIndex = 0;
 };
 
+// 供 ImGui 等 Vulkan 专用插件获取的原生句柄。
+struct VulkanNativeHandles {
+    VkInstance       instance            = VK_NULL_HANDLE;
+    VkPhysicalDevice physicalDevice      = VK_NULL_HANDLE;
+    VkDevice         device              = VK_NULL_HANDLE;
+    VkQueue          graphicsQueue       = VK_NULL_HANDLE;
+    uint32_t         graphicsQueueFamily = 0;
+    VkRenderPass     renderPass          = VK_NULL_HANDLE;
+    uint32_t         imageCount          = 0;
+};
+
 class VulkanCommandBuffer : public IRHICommandBuffer {
 public:
     VulkanCommandBuffer(VulkanRenderContext* ctx, VkCommandBuffer cmd)
@@ -70,6 +81,10 @@ public:
     Format   GetSwapchainFormat() const override;
     uint32_t GetSwapchainWidth() const override;
     uint32_t GetSwapchainHeight() const override;
+
+    // 原生句柄（供 ImGui 等 Vulkan 专用插件使用）
+    VulkanNativeHandles GetNativeHandles() const;
+    VkCommandBuffer     GetCommandBufferHandle(uint32_t frameIndex) const;
 
     IRHICommandBuffer* GetCommandBuffer(uint32_t frameIndex) override;
     void BeginFrame(uint32_t frameIndex, uint32_t& imageIndex) override;

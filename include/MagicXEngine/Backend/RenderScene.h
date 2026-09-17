@@ -1,5 +1,6 @@
 #pragma once
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <vector>
 #include "MagicXEngine/Frontend/Scene.h"
@@ -25,8 +26,11 @@ public:
     // 上传场景几何数据、创建渲染管线
     void Load(const Frontend::Scene& scene);
 
-    // 每帧渲染（frameIndex: 帧在飞行索引）
-    void Render(uint32_t frameIndex);
+    // 每帧同步相机与对象变换（交互/动画用，不重建 GPU 资源）
+    void Update(const Frontend::Scene& scene);
+
+    // 每帧渲染（frameIndex: 帧在飞行索引）。uiRender 在 render pass 内、场景绘制后调用（用于 ImGui 叠加层）。
+    void Render(uint32_t frameIndex, const std::function<void()>& uiRender = nullptr);
 
 private:
     struct GpuObject {
@@ -38,7 +42,11 @@ private:
     };
 
     // Indirect 模式：compute 生成间接命令 → barrier → 间接绘制
-    void RenderIndirect(RHI::IRHICommandBuffer* cmd, float aspect, uint32_t w, uint32_t h);
+    void RenderIndirect(RHI::IRHICommandBuffer* cmd, float aspect, uint32_t w, uint32_t h,
+                        const std::function<void()>& uiRender);
+
+    // 投影矩阵（透视相机时应用 Vulkan NDC Y 翻转）
+    Math::Mat4 ComputeProjection(float aspect) const;
 
     RHI::IRHIDevice* m_device = nullptr;
     std::unique_ptr<RHI::IRHIPipeline> m_pipeline;

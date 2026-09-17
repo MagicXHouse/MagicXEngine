@@ -33,6 +33,7 @@ private:
     VkPresentModeKHR   ChoosePresentMode(const std::vector<VkPresentModeKHR>& available);
     VkExtent2D         ChooseExtent(const VkSurfaceCapabilitiesKHR& caps,
                                     uint32_t defaultWidth, uint32_t defaultHeight);
+    void CreateDepthResources();
 
     VkPhysicalDevice m_physical;
     VkDevice         m_device;
@@ -45,6 +46,10 @@ private:
     std::vector<VkImage>       m_images;
     std::vector<VkImageView>   m_imageViews;
     std::vector<VkFramebuffer> m_framebuffers;
+
+    VkImage        m_depthImage     = VK_NULL_HANDLE;
+    VkDeviceMemory m_depthMemory    = VK_NULL_HANDLE;
+    VkImageView    m_depthImageView = VK_NULL_HANDLE;
 };
 
 } // namespace MagicXEngine::RHI

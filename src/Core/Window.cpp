@@ -25,6 +25,25 @@ Window::Window(uint32_t width, uint32_t height, const std::string& title) {
         auto* self = static_cast<Window*>(glfwGetWindowUserPointer(w));
         self->m_wasResized = true;
     });
+    glfwSetKeyCallback(m_handle, [](GLFWwindow* w, int key, int /*scancode*/, int action, int /*mods*/) {
+        auto* self = static_cast<Window*>(glfwGetWindowUserPointer(w));
+        if (action == GLFW_PRESS)        self->m_keysDown.insert(key);
+        else if (action == GLFW_RELEASE) self->m_keysDown.erase(key);
+    });
+    glfwSetMouseButtonCallback(m_handle, [](GLFWwindow* w, int button, int action, int /*mods*/) {
+        auto* self = static_cast<Window*>(glfwGetWindowUserPointer(w));
+        if (action == GLFW_PRESS)        self->m_mouseButtonsDown.insert(button);
+        else if (action == GLFW_RELEASE) self->m_mouseButtonsDown.erase(button);
+    });
+    glfwSetCursorPosCallback(m_handle, [](GLFWwindow* w, double xpos, double ypos) {
+        auto* self = static_cast<Window*>(glfwGetWindowUserPointer(w));
+        self->m_mouseX = xpos;
+        self->m_mouseY = ypos;
+    });
+    glfwSetScrollCallback(m_handle, [](GLFWwindow* w, double /*xoffset*/, double yoffset) {
+        auto* self = static_cast<Window*>(glfwGetWindowUserPointer(w));
+        self->m_scrollY += yoffset;
+    });
 }
 
 Window::~Window() {
@@ -70,6 +89,25 @@ std::vector<const char*> Window::GetRequiredInstanceExtensions() const {
     uint32_t count = 0;
     const char** extensions = glfwGetRequiredInstanceExtensions(&count);
     return std::vector<const char*>(extensions, extensions + count);
+}
+
+bool Window::IsKeyDown(int key) const {
+    return m_keysDown.count(key) != 0;
+}
+
+bool Window::IsMouseButtonDown(int button) const {
+    return m_mouseButtonsDown.count(button) != 0;
+}
+
+void Window::GetMousePos(double& x, double& y) const {
+    x = m_mouseX;
+    y = m_mouseY;
+}
+
+double Window::ConsumeScrollY() {
+    const double v = m_scrollY;
+    m_scrollY = 0.0;
+    return v;
 }
 
 } // namespace MagicXEngine::Core

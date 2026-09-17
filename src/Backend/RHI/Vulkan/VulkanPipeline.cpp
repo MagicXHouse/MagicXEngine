@@ -121,8 +121,9 @@ VulkanPipeline::VulkanPipeline(VkDevice device, VkRenderPass renderPass,
 
     VkPipelineDepthStencilStateCreateInfo depthStencil{};
     depthStencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
-    depthStencil.depthTestEnable       = VK_FALSE;
-    depthStencil.depthWriteEnable      = VK_FALSE;
+    depthStencil.depthTestEnable       = desc.depthTestEnable ? VK_TRUE : VK_FALSE;
+    depthStencil.depthWriteEnable      = desc.depthWriteEnable ? VK_TRUE : VK_FALSE;
+    depthStencil.depthCompareOp        = VK_COMPARE_OP_LESS;
     depthStencil.stencilTestEnable     = VK_FALSE;
 
     VkPipelineColorBlendAttachmentState colorBlendAttachment{};

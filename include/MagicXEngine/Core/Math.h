@@ -44,6 +44,17 @@ struct Mat4 {
         r.m[0] = s.x; r.m[5] = s.y; r.m[10] = s.z; r.m[15] = 1.0f;
         return r;
     }
+    // OpenGL 裁剪空间 → Vulkan 裁剪空间：
+    //   翻转 Y（NDC Y 向下）+ 重映射 Z（OpenGL [-w,w] → Vulkan [0,w]）
+    static Mat4 GLToVulkanClip() {
+        Mat4 r;
+        r.m[0]  = 1.0f;
+        r.m[5]  = -1.0f;
+        r.m[10] = 0.5f;
+        r.m[14] = 0.5f;
+        r.m[15] = 1.0f;
+        return r;
+    }
     static Mat4 RotateX(float rad) {
         Mat4 r = Identity();
         const float c = std::cos(rad), s = std::sin(rad);
@@ -113,6 +124,20 @@ inline Mat4 Perspective(float fovYDeg, float aspect, float nearPlane, float farP
     r.m[10] = (farPlane + nearPlane) / (nearPlane - farPlane);
     r.m[11] = -1.0f;
     r.m[14] = (2.0f * farPlane * nearPlane) / (nearPlane - farPlane);
+    return r;
+}
+
+// 正交投影（OpenGL 惯例，Y 轴向上，z 映射到 [-1,1]）
+inline Mat4 Orthographic(float left, float right, float bottom, float top,
+                         float nearPlane, float farPlane) {
+    Mat4 r;
+    r.m[0]  = 2.0f / (right - left);
+    r.m[5]  = 2.0f / (top - bottom);
+    r.m[10] = -2.0f / (farPlane - nearPlane);
+    r.m[12] = -(right + left) / (right - left);
+    r.m[13] = -(top + bottom) / (top - bottom);
+    r.m[14] = -(farPlane + nearPlane) / (farPlane - nearPlane);
+    r.m[15] = 1.0f;
     return r;
 }
 

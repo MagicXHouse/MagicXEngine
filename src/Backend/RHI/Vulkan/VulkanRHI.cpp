@@ -110,10 +110,11 @@ void VulkanCommandBuffer::BeginRenderPass() {
     bi.renderArea.offset = { 0, 0 };
     bi.renderArea.extent = m_ctx->swapchain->GetExtent();
 
-    VkClearValue clear{};
-    clear.color = { { 0.02f, 0.02f, 0.04f, 1.0f } };
-    bi.clearValueCount = 1;
-    bi.pClearValues    = &clear;
+    VkClearValue clearValues[2];
+    clearValues[0].color        = { { 0.02f, 0.02f, 0.04f, 1.0f } };
+    clearValues[1].depthStencil = { 1.0f, 0 };
+    bi.clearValueCount = 2;
+    bi.pClearValues    = clearValues;
 
     vkCmdBeginRenderPass(m_cmd, &bi, VK_SUBPASS_CONTENTS_INLINE);
 }
@@ -411,23 +412,40 @@ void VulkanDevice::CreateRenderPass() {
     ref.attachment = 0;
     ref.layout     = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
+    VkAttachmentDescription depth{};
+    depth.format         = VK_FORMAT_D32_SFLOAT;
+    depth.samples        = VK_SAMPLE_COUNT_1_BIT;
+    depth.loadOp         = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    depth.storeOp        = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    depth.stencilLoadOp  = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+    depth.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    depth.initialLayout  = VK_IMAGE_LAYOUT_UNDEFINED;
+    depth.finalLayout    = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
+    VkAttachmentReference depthRef{};
+    depthRef.attachment = 1;
+    depthRef.layout     = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
     VkSubpassDescription subpass{};
     subpass.pipelineBindPoint    = VK_PIPELINE_BIND_POINT_GRAPHICS;
     subpass.colorAttachmentCount = 1;
     subpass.pColorAttachments    = &ref;
+    subpass.pDepthStencilAttachment = &depthRef;
 
     VkSubpassDependency dep{};
     dep.srcSubpass    = VK_SUBPASS_EXTERNAL;
     dep.dstSubpass    = 0;
-    dep.srcStageMask  = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    dep.srcStageMask  = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
     dep.srcAccessMask = 0;
-    dep.dstStageMask  = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-    dep.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+    dep.dstStageMask  = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
+    dep.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+
+    VkAttachmentDescription attachments[] = { color, depth };
 
     VkRenderPassCreateInfo ci{};
     ci.sType           = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-    ci.attachmentCount = 1;
-    ci.pAttachments    = &color;
+    ci.attachmentCount = 2;
+    ci.pAttachments    = attachments;
     ci.subpassCount    = 1;
     ci.pSubpasses      = &subpass;
     ci.dependencyCount = 1;
@@ -583,6 +601,22 @@ uint32_t VulkanDevice::GetSwapchainWidth() const {
 
 uint32_t VulkanDevice::GetSwapchainHeight() const {
     return m_swapchain->GetExtent().height;
+}
+
+VulkanNativeHandles VulkanDevice::GetNativeHandles() const {
+    VulkanNativeHandles h;
+    h.instance            = m_instance;
+    h.physicalDevice      = m_physicalDevice;
+    h.device              = m_device;
+    h.graphicsQueue       = m_graphicsQueue;
+    h.graphicsQueueFamily = m_graphicsFamily;
+    h.renderPass          = m_renderPass;
+    h.imageCount          = m_swapchain->GetImageCount();
+    return h;
+}
+
+VkCommandBuffer VulkanDevice::GetCommandBufferHandle(uint32_t frameIndex) const {
+    return m_commandBuffers[frameIndex];
 }
 
 IRHICommandBuffer* VulkanDevice::GetCommandBuffer(uint32_t frameIndex) {
