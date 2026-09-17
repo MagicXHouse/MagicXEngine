@@ -14,6 +14,48 @@
 
 数据流：案例填场景 → 前端 Scene → 后端 RenderScene 上传 GPU → RHI 渲染。
 
+## 案例（Cases）
+
+5 个 case 按「从直接绘制 → GPU 驱动 → meshlet 剔除」的演进路径编排，逐步验证 GPU-Driven 所需的能力：
+
+> **演进路径**：Case01 直接绘制 → Case02 间接绘制（GPU 驱动雏形）→ Case03 相机/交互基础 → Case04 meshlet 逐块剔除 → Case05 量化 meshlet vs 普通剔除的差距。
+
+| 案例 | 可执行文件 | 渲染模式 | 目的 |
+|------|-----------|---------|------|
+| Case01 | Case01_Triangle.exe | Direct | 跑通三层架构数据流 |
+| Case02 | Case02_GPUDriven.exe | Indirect | compute 写间接命令 + 间接绘制 |
+| Case03 | Case03_Perspective.exe | Direct | 透视/正交相机 + ImGui + 鼠标 |
+| Case04 | Case04_Meshlet.exe | Meshlet | meshlet 逐块视锥剔除 |
+| Case05 | Case05_Comparison.exe | Meshlet / Culled | meshlet vs 普通剔除（三角形数 + FPS） |
+
+> 渲染模式（`Frontend::RenderMode`）：`Direct` 无剔除直绘；`Indirect` compute 写固定间接命令；`Meshlet` GPU 逐 meshlet 视锥剔除 + 间接绘制；`Culled` CPU 逐对象视锥剔除 + 直绘。
+
+### Case01 - 彩色三角形（Case01_Triangle.exe）
+- **做了什么**：画一个 RGB 彩色三角形，跑通三层架构完整数据流（案例层 → 前端 Scene/Mesh/Transform → 后端 RenderScene → RHI/Vulkan）。
+- **技术点**：默认「屏幕空间」相机（NDC 直通、无投影矩阵）；顶点/索引/颜色上传；Direct 模式 DrawIndexed 直绘。
+- **验证**：运行看到彩色三角形即可；改 triangle.transform 可验证 MVP 生效。
+
+### Case02 - GPU 驱动冒烟测试（Case02_GPUDriven.exe）
+- **做了什么**：与 Case01 相同的三角形，但 renderMode = Indirect —— compute shader（cull.comp）写一条固定 DrawIndexedIndirectCommand 到 SSBO，barrier 后由 DrawIndexedIndirect 间接绘制。
+- **技术点**：compute pipeline、storage/indirect 缓冲、compute→draw 的 pipeline barrier、间接绘制。
+- **验证**：RenderDoc 抓帧看 compute dispatch 在 render pass 之前、间接缓冲内容、barrier 无 SYNC-HAZARD。
+
+### Case03 - 透视相机 + ImGui + 鼠标交互（Case03_Perspective.exe）
+- **做了什么**：透视/正交相机下画彩色立方体，带 ImGui 面板和鼠标交互。
+- **技术点**：透视投影（OpenGL 惯例 → GLToVulkanClip 转 Vulkan 裁剪空间）、正交投影、ImGui 插件、transform 交互。
+- **交互**：左键旋转 / 中键移动 / 滚轮缩放；面板勾选 Orthographic 切正交、滑块调旋转/缩放、按钮重置。
+
+### Case04 - meshlet 逐块视锥剔除（Case04_Meshlet.exe）
+- **做了什么**：150×150 大网格（45000 三角形）分成约 460 个 meshlet，compute shader 逐 meshlet 做视锥剔除，视锥外的 meshlet instanceCount=0 跳过绘制。
+- **技术点**：meshlet 构建（贪心 BFS）、meshlet 描述 SSBO、逐 meshlet 视锥剔除 compute、间接多命令绘制。
+- **验证**：RenderDoc 看 indirect buffer 中 instanceCount 的 3/0 分布。
+- **注意**：meshlet 路径已改为「多对象平铺到世界空间」，此 case 的鼠标交互（移动网格）暂不生效，作静态剔除验证；交互演示见 Case05。
+
+### Case05 - meshlet vs 普通剔除 对比（Case05_Comparison.exe）
+- **做了什么**：25×25 个 patch（约 78 万三角形）场景，量化「CPU 逐对象剔除」与「GPU 逐 meshlet 剔除」的三角形数差异和真实 FPS。ImGui 的 checkbox 是 A/B 开关。
+- **技术点**：多对象平铺（FlattenObjects）、世界空间视锥剔除、FPS 测量、运行时切换渲染模式。
+- **交互**：左键旋转 / 中键平移 / 滚轮缩放相机；勾选「Use meshlet culling」在 meshlet/普通渲染间切换，观察 FPS 与「Drawing now」变化。
+
 ## 目录结构
 
 ```
@@ -38,8 +80,12 @@ MagicXEngine/
 │       ├── RenderScene.cpp
 │       └── RHI/                #   RHI.cpp
 │           └── Vulkan/         #   Vulkan*.cpp
-└── cases/                      # ★ 案例层（每个 case 一个可执行文件）
-    └── Case01_Triangle.cpp     # 彩色三角形
+└── cases/                      # ★ 案例层（每个 case 一个可执行文件，说明见下方「案例」）
+    ├── Case01_Triangle.cpp     # 彩色三角形（直接绘制）
+    ├── Case02_GPUDriven.cpp    # GPU 驱动（间接绘制）冒烟测试
+    ├── Case03_Perspective.cpp  # 透视相机 + ImGui + 鼠标交互
+    ├── Case04_Meshlet.cpp      # meshlet 逐块视锥剔除
+    └── Case05_Comparison.cpp   # meshlet vs 普通剔除 对比
 ```
 
 ## 依赖
